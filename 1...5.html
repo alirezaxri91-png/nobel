@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ویرایشگر حرفه‌ای روی تصویر</title>
+    
+    <!-- فونت وزیرمتن -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            background-image: url('https://cdn.imgurl.ir/uploads/e003469_76b36cab-6e59-4db3-9f5a-d02935b32a0b.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            transition: background-color 0.3s, filter 0.3s;
+        }
+
+        /* حالت ویرایش */
+        body.mode-edit { cursor: text; }
+        body.mode-edit .draggable-item { cursor: text; }
+        body.mode-edit .text-content { border-bottom: 1px dashed #ffffff; }
+
+        /* حالت حذف */
+        body.mode-delete { cursor: crosshair; }
+        body.mode-delete .draggable-item {
+            cursor: not-allowed;
+            opacity: 0.7;
+            border: 1px solid red;
+        }
+
+        /* استایل آیتم‌های قابل جابجایی */
+        .draggable-item {
+            position: absolute;
+            color: #ffffff;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+            user-select: none;
+            white-space: nowrap;
+            z-index: 10;
+        }
+
+        .draggable-item:active { cursor: grabbing; }
+
+        .text-content {
+            outline: none;
+            padding: 2px 5px;
+        }
+
+        .text-content.editing {
+            border-bottom: 1px dashed #ffffff;
+            user-select: text;
+            cursor: text;
+        }
+
+        /* پنل کنترل */
+        #controlPanel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0, 0, 0, 0.9);
+            border: 2px solid #cda863;
+            border-radius: 10px;
+            padding: 15px;
+            color: white;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 2000;
+            direction: rtl;
+            width: 280px;
+            max-height: 80vh;
+            overflow-y: auto;
+            backdrop-filter: blur(5px);
+        }
+
+        #controlPanel h3 {
+            margin: 0 0 5px 0;
+            text-align: center;
+            color: #cda863;
+            font-size: 16px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        #controlPanel button {
+            background-color: #2b0000;
+            color: white;
+            border: 1px solid #cda863;
+            border-radius: 5px;
+            padding: 6px;
+            cursor: pointer;
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            font-size: 13px;
+            transition: background 0.3s;
+        }
+
+        #controlPanel button:hover { background-color: #4a0000; }
+        #controlPanel button.danger { border-color: #ff4444; color: #ff4444; }
+        #controlPanel button.danger:hover { background-color: #440000; }
+
+        .panel-section {
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 8px;
+            margin-bottom: 5px;
+        }
+
+        .panel-section h4 {
+            margin: 0 0 5px 0;
+            font-size: 13px;
+            color: #cda863;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1a1a1a;
+            padding: 3px 5px;
+            margin-bottom: 3px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .item-row input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-family: 'Vazirmatn';
+            font-size: 12px;
+            width: 60%;
+            outline: none;
+            border-bottom: 1px dotted #666;
+        }
+
+        .item-row input:focus { border-bottom-color: #cda863; }
+
+        .item-row .del-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .item-row .del-btn:hover { background: #cc0000; }
+
+        .help-text {
+            font-size: 11px;
+            color: #aaa;
+            text-align: center;
+            margin-top: 5px;
+            line-height: 1.6;
+        }
+
+        /* پنجره راهنما */
+        #helpModal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #cda863;
+            border-radius: 15px;
+            padding: 25px;
+            color: white;
+            display: none;
+            z-index: 3000;
+            width: 450px;
+            max-height: 80vh;
+            overflow-y: auto;
+            direction: rtl;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+
+        #helpModal h2 {
+            text-align: center;
+            color: #cda863;
+            margin-top: 0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        #helpModal ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        #helpModal li {
+            margin-bottom: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+            border-bottom: 1px solid #222;
+            padding-bottom: 5px;
+        }
+
+        #helpModal .key {
+            display: inline-block;
+            background: #333;
+            border: 1px solid #666;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-weight: bold;
+            color: #cda863;
+            min-width: 30px;
+            text-align: center;
+            margin-left: 5px;
+        }
+
+        #helpModal .close-btn {
+            display: block;
+            margin: 15px auto 0;
+            background: #cda863;
+            color: black;
+            border: none;
+            padding: 8px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'Vazirmatn';
+        }
+
+        #helpModal .close-btn:hover { background: #e0c080; }
+
+        /* پنل فیلتر */
+        #filterPanel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #cda863;
+            border-radius: 10px;
+            padding: 20px;
+            color: white;
+            display: none;
+            z-index: 2500;
+            width: 300px;
+            direction: rtl;
+            text-align: center;
+        }
+
+        #filterPanel h3 {
+            margin-top: 0;
+            color: #cda863;
+        }
+
+        #filterPanel label {
+            display: block;
+            margin: 10px 0 5px;
+            font-size: 13px;
+        }
+
+        #filterPanel input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        #filterPanel .filter-value {
+            font-size: 12px;
+            color: #cda863;
+        }
+
+        #filterPanel button {
+            margin-top: 15px;
+            background: #cda863;
+            color: black;
+            border: none;
+            padding: 6px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Vazirmatn';
+            font-weight: bold;
+        }
+
+        /* فایل ورودی مخفی */
+        #bgFileInput { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- پنل کنترل -->
+    <div id="controlPanel">
+        <h3>پنل کنترل</h3>
+        
+        <div class="panel-section">
+            <h4>افزودن</h4>
+            <button onclick="createItem('text', 'متن جدید')" style="width:100%; margin-bottom:3px;">➕ متن جدید</button>
+            <button onclick="createItem('number', '0')" style="width:100%;">➕ عدد جدید</button>
+        </div>
+
+        <div class="panel-section">
+            <h4>لیست آیتم‌ها (ویرایش/حذف)</h4>
+            <div id="itemsList">
+                <!-- لیست آیتم ها توسط جاوااسکریپت پر می شود -->
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h4>تنظیم پس‌زمینه</h4>
+            <input type="text" id="bgUrlInput" placeholder="لینک عکس را وارد کنید..." style="width:100%; padding:5px; margin-bottom:5px; border-radius:3px; border:1px solid #555; background:#222; color:white; font-family:Vazirmatn; font-size:12px; box-sizing:border-box;">
+            <button onclick="setBgFromUrl()" style="width:100%; margin-bottom:3px;">اعمال لینک</button>
+            <button onclick="document.getElementById('bgFileInput').click()" style="width:100%;">📁 انتخاب از فایل‌ها</button>
+            <input type="file" id="bgFileInput" accept="image/*" onchange="setBgFromFile(event)">
+        </div>
+
+        <div class="panel-section">
+            <button onclick="openHelp()" style="width:100%;">📖 راهنما (=)</button>
+            <button class="danger" onclick="resetAll()" style="width:100%; margin-top:5px;">🔄 حالت پیش‌فرض</button>
+        </div>
+
+        <div class="help-text">
+            کلید ÷ برای بستن پنل<br>
+            M ویرایش | Q حذف | F9+Z فیلتر
+        </div>
+    </div>
+
+    <!-- پنجره راهنما -->
+    <div id="helpModal">
+        <h2>📖 راهنمای کامل</h2>
+        <ul>
+            <li><span class="key">T</span> افزودن یک متن جدید</li>
+            <li><span class="key">P</span> افزودن یک عدد جدید</li>
+            <li><span class="key">M</span> فعال/غیرفعال کردن حالت ویرایش (روی متن کلیک کنید)</li>
+            <li><span class="key">Q</span> فعال/غیرفعال کردن حالت حذف (روی متن کلیک کنید)</li>
+            <li><span class="key">÷</span> باز/بسته کردن پنل کنترل (همان ` در کیبورد فارسی)</li>
+            <li><span class="key">=</span> نمایش این راهنما</li>
+            <li><span class="key">F9</span> + <span class="key">Z</span> باز/بسته کردن فیلتر اشباع نوری و گرما</li>
+            <li><span class="key">Esc</span> خروج از حالت ویرایش/حذف</li>
+        </ul>
+        <p style="font-size:12px; color:#aaa; text-align:center;">برای جابجایی، در حالت عادی روی متن کلیک کنید و بکشید.</p>
+        <button class="close-btn" onclick="closeHelp()">بستن</button>
+    </div>
+
+    <!-- پنل فیلتر -->
+    <div id="filterPanel">
+        <h3>🎨 فیلتر اشباع نوری و گرما</h3>
+        
+        <label>اشباع رنگ (Saturation): <span id="satVal" class="filter-value">100%</span></label>
+        <input type="range" id="satRange" min="0" max="300" value="100" oninput="applyFilter()">
+        
+        <label>روشنایی (Brightness): <span id="briVal" class="filter-value">100%</span></label>
+        <input type="range" id="briRange" min="0" max="200" value="100" oninput="applyFilter()">
+        
+        <label>کنتراست (Contrast): <span id="conVal" class="filter-value">100%</span></label>
+        <input type="range" id="conRange" min="0" max="200" value="100" oninput="applyFilter()">
+        
+        <label>ته‌رنگ گرم (Sepia): <span id="sepVal" class="filter-value">0%</span></label>
+        <input type="range" id="sepRange" min="0" max="100" value="0" oninput="applyFilter()">
+        
+        <label>تیرگی (Hue Rotate): <span id="hueVal" class="filter-value">0deg</span></label>
+        <input type="range" id="hueRange" min="0" max="360" value="0" oninput="applyFilter()">
+
+        <button onclick="resetFilter()">بازنشانی فیلتر</button>
+    </div>
+
+    <script>
+        let itemCounter = 0;
+        let currentMode = 'none';
+        let isPanelOpen = false;
+        let isFilterPanelOpen = false;
+        let isHelpOpen = false;
+        let keysPressed = {}; // برای تشخیص همزمان F9 و Z
+
+        // --- ذخیره و بازیابی ---
+        function saveState() {
+            const items = [];
+            document.querySelectorAll('.draggable-item').forEach(el => {
+                items.push({
+                    id: el.id,
+                    type: el.dataset.type,
+                    content: el.querySelector('.text-content').textContent,
+                    top: el.style.top,
+                    left: el.style.left,
+                    right: el.style.right,
+                    bottom: el.style.bottom,
+                    direction: el.style.direction
+                });
+            });
+            
+            // ذخیره پس زمینه
+            const bg = document.body.style.backgroundImage;
+            const savedBg = localStorage.getItem('editorBg');
+            const finalBg = bg || savedBg;
+
+            // ذخیره فیلتر
+            const filter = document.body.style.filter;
+            
+            const state = {
+                items: items,
+                bg: finalBg,
+                filter: filter
+            };
+            
+            localStorage.setItem('imageEditorState', JSON.stringify(state));
+            updatePanelList();
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem('imageEditorState');
+            if (saved) {
+                try {
+                    const state = JSON.parse(saved);
+                    
+                    // بازیابی پس زمینه
+                    if (state.bg) {
+                        document.body.style.backgroundImage = state.bg;
+                        const urlMatch = state.bg.match(/url\("?(.+?)"?\)/);
+                        if (urlMatch && urlMatch[1]) {
+                            document.getElementById('bgUrlInput').value = urlMatch[1];
+                        }
+                    }
+
+                    // بازیابی فیلتر
+                    if (state.filter) {
+                        document.body.style.filter = state.filter;
+                    }
+
+                    // بازیابی آیتم ها
+                    if (state.items && state.items.length > 0) {
+                        state.items.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'draggable-item';
+                            div.id = item.id;
+                            div.dataset.type = item.type;
+                            div.style.top = item.top || '50%';
+                            div.style.left = item.left || '50%';
+                            div.style.right = item.right || 'auto';
+                            div.style.bottom = item.bottom || 'auto';
+                            div.style.direction = item.direction || 'rtl';
+                            
+                            div.innerHTML = `<span class="text-content">${item.content}</span>`;
+                            document.body.appendChild(div);
+                            
+                            setupDragAndDrop(div);
+                            
+                            if (item.type === 'number') {
+                                const textSpan = div.querySelector('.text-content');
+                                textSpan.addEventListener('keypress', function(e) {
+                                    if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab') {
+                                        e.preventDefault();
+                                    }
+                                });
+                            }
+                            
+                            const num = parseInt(item.id.replace('item-', ''));
+                            if (num > itemCounter) itemCounter = num;
+                        });
+                    }
+                } catch (e) { console.error("Error loading:", e); }
+            }
+            
+            // اگر خالی بود، دو متن اولیه
+            if (document.querySelectorAll('.draggable-item').length === 0) {
+                const t1 = createItem('text', 'متن اول');
+                t1.style.top = '65%'; t1.style.right = '25%'; t1.style.left = 'auto';
+                const t2 = createItem('text', 'متن دوم');
+                t2.style.top = '65%'; t2.style.left = '25%'; t2.style.right = 'auto';
+            }
+            updatePanelList();
+        }
+
+        // --- توابع ساخت آیتم ---
+        function createItem(type, content = '') {
+            itemCounter++;
+            const id = 'item-' + itemCounter;
+            
+            const div = document.createElement('div');
+            div.className = 'draggable-item';
+            div.id = id;
+            div.dataset.type = type;
+            
+            const randomTop = 30 + Math.random() * 40;
+            const randomLeft = 30 + Math.random() * 40;
+            div.style.top = randomTop + '%';
+            div.style.left = randomLeft + '%';
+
+            if (type === 'number') div.style.direction = 'ltr';
+            else div.style.direction = 'rtl';
+
+            div.innerHTML = `<span class="text-content">${content}</span>`;
+            document.body.appendChild(div);
+            setupDragAndDrop(div);
+
+            if (type === 'number') {
+                const textSpan = div.querySelector('.text-content');
+                textSpan.addEventListener('keypress', function(e) {
+                    if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab') {
+                        e.preventDefault();
+                    }
+                });
+            }
+
+            saveState();
+            return div;
+        }
+
+        // --- به‌روزرسانی لیست پنل ---
+        function updatePanelList() {
+            const list = document.getElementById('itemsList');
+            if (!list) return;
+            list.innerHTML = '';
+            
+            document.querySelectorAll('.draggable-item').forEach(el => {
+                const id = el.id;
+                const type = el.dataset.type;
+                const content = el.querySelector('.text-content').textContent;
+                
+                const row = document.createElement('div');
+                row.className = 'item-row';
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = content;
+                input.onchange = function() {
+                    el.querySelector('.text-content').textContent = this.value;
+                    saveState();
+                };
+                // برای اعداد فقط عدد قبول کن
+                if (type === 'number') {
+                    input.onkeypress = function(e) {
+                        if (!/[0-9]/.test(e.key)) e.preventDefault();
+                    };
+                }
+                
+                const delBtn = document.createElement('button');
+                delBtn.className = 'del-btn';
+                delBtn.textContent = '✕';
+                delBtn.onclick = function() {
+                    el.remove();
+                    saveState();
+                };
+                
+                row.appendChild(input);
+                row.appendChild(delBtn);
+                list.appendChild(row);
+            });
+        }
+
+        // --- مدیریت حالت‌ها ---
+        function setMode(mode) {
+            currentMode = mode;
+            document.body.classList.remove('mode-edit', 'mode-delete');
+            if (mode === 'edit') document.body.classList.add('mode-edit');
+            else if (mode === 'delete') document.body.classList.add('mode-delete');
+        }
+
+        // --- Drag & Drop ---
+        function setupDragAndDrop(el) {
+            let isDragging = false;
+            let offsetX, offsetY;
+
+            el.addEventListener('mousedown', function(e) {
+                if (currentMode === 'edit' || currentMode === 'delete') return;
+                if (e.target.classList.contains('editing') || e.target.isContentEditable) return;
+
+                isDragging = true;
+                const rect = el.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+
+                el.style.left = rect.left + 'px';
+                el.style.top = rect.top + 'px';
+                el.style.right = 'auto';
+                el.style.bottom = 'auto';
+                el.style.zIndex = 100;
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                let newLeft = e.clientX - offsetX;
+                let newTop = e.clientY - offsetY;
+                newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - el.offsetWidth));
+                newTop = Math.max(0, Math.min(newTop, window.innerHeight - el.offsetHeight));
+                el.style.left = newLeft + 'px';
+                el.style.top = newTop + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    el.style.zIndex = '';
+                    saveState();
+                }
+            });
+
+            el.addEventListener('click', function(e) {
+                if (currentMode === 'delete') {
+                    el.remove();
+                    saveState();
+                } 
+                else if (currentMode === 'edit') {
+                    const textSpan = el.querySelector('.text-content');
+                    textSpan.contentEditable = "true";
+                    textSpan.classList.add('editing');
+                    textSpan.focus();
+                    
+                    const range = document.createRange();
+                    range.selectNodeContents(textSpan);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            });
+        }
+
+        // بستن ویرایش با کلیک روی جای خالی
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.draggable-item')) {
+                document.querySelectorAll('.text-content').forEach(span => {
+                    if (span.isContentEditable) {
+                        span.contentEditable = "false";
+                        span.classList.remove('editing');
+                        saveState();
+                    }
+                });
+            }
+        });
+
+        // --- راهنما ---
+        function openHelp() {
+            isHelpOpen = true;
+            document.getElementById('helpModal').style.display = 'block';
+            if (isPanelOpen) togglePanel(); // بستن پنل اگر باز است
+        }
+        function closeHelp() {
+            isHelpOpen = false;
+            document.getElementById('helpModal').style.display = 'none';
+        }
+
+        // --- پنل ---
+        function togglePanel() {
+            isPanelOpen = !isPanelOpen;
+            document.getElementById('controlPanel').style.display = isPanelOpen ? 'flex' : 'none';
+            if (isPanelOpen) updatePanelList();
+        }
+
+        // --- تنظیم پس‌زمینه ---
+        function setBgFromUrl() {
+            const url = document.getElementById('bgUrlInput').value.trim();
+            if (url) {
+                document.body.style.backgroundImage = `url('${url}')`;
+                saveState();
+            }
+        }
+
+        function setBgFromFile(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.body.style.backgroundImage = `url('${e.target.result}')`;
+                    saveState();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // --- فیلتر ---
+        function applyFilter() {
+            const sat = document.getElementById('satRange').value;
+            const bri = document.getElementById('briRange').value;
+            const con = document.getElementById('conRange').value;
+            const sep = document.getElementById('sepRange').value;
+            const hue = document.getElementById('hueRange').value;
+
+            document.getElementById('satVal').textContent = sat + '%';
+            document.getElementById('briVal').textContent = bri + '%';
+            document.getElementById('conVal').textContent = con + '%';
+            document.getElementById('sepVal').textContent = sep + '%';
+            document.getElementById('hueVal').textContent = hue + 'deg';
+
+            document.body.style.filter = `saturate(${sat}%) brightness(${bri}%) contrast(${con}%) sepia(${sep}%) hue-rotate(${hue}deg)`;
+        }
+
+        function resetFilter() {
+            document.getElementById('satRange').value = 100;
+            document.getElementById('briRange').value = 100;
+            document.getElementById('conRange').value = 100;
+            document.getElementById('sepRange').value = 0;
+            document.getElementById('hueRange').value = 0;
+            applyFilter();
+        }
+
+        function toggleFilterPanel() {
+            isFilterPanelOpen = !isFilterPanelOpen;
+            document.getElementById('filterPanel').style.display = isFilterPanelOpen ? 'block' : 'none';
+            
+            if (!isFilterPanelOpen) {
+                // اگر بسته شد، فیلتر را از روی صفحه بردار
+                document.body.style.filter = '';
+                resetFilter();
+            } else {
+                applyFilter();
+            }
+        }
+
+        // --- حالت پیش‌فرض ---
+        function resetAll() {
+            if (confirm('آیا مطمئن هستید که می‌خواهید همه چیز را به حالت پیش‌فرض برگردانید؟')) {
+                localStorage.removeItem('imageEditorState');
+                document.querySelectorAll('.draggable-item').forEach(el => el.remove());
+                document.body.style.backgroundImage = "url('https://cdn.imgurl.ir/uploads/e003469_76b36cab-6e59-4db3-9f5a-d02935b32a0b.png')";
+                document.body.style.filter = '';
+                resetFilter();
+                document.getElementById('bgUrlInput').value = '';
+                itemCounter = 0;
+                
+                // دو متن پیش فرض
+                const t1 = createItem('text', 'متن اول');
+                t1.style.top = '65%'; t1.style.right = '25%'; t1.style.left = 'auto';
+                const t2 = createItem('text', 'متن دوم');
+                t2.style.top = '65%'; t2.style.left = '25%'; t2.style.right = 'auto';
+                
+                saveState();
+            }
+        }
+
+        // --- مدیریت کیبورد ---
+        document.addEventListener('keydown', function(e) {
+            // ثبت کلیدهای فشرده شده
+            keysPressed[e.key] = true;
+
+            // تشخیص همزمان F9 و Z
+            if (keysPressed['F9'] && (keysPressed['z'] || keysPressed['Z'])) {
+                e.preventDefault();
+                toggleFilterPanel();
+                // پاک کردن کلیدها برای جلوگیری از تکرار
+                keysPressed['F9'] = false;
+                keysPressed['z'] = false;
+                keysPressed['Z'] = false;
+                return;
+            }
+
+            // اگر کاربر در حال تایپ است، کلیدهای میانبر را اجرا نکن (به جز Escape)
+            if (e.target.isContentEditable && e.key !== 'Escape') return;
+            // اگر روی input پنل است، کاری نکن
+            if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+
+            const key = e.key.toLowerCase();
+            
+            // کلید ÷ یا ` برای باز/بسته کردن پنل
+            if (e.key === '÷' || e.key === '`' || e.key === 'Backquote') {
+                e.preventDefault();
+                togglePanel();
+                return;
+            }
+
+            // کلید = برای راهنما
+            if (e.key === '=' || e.key === '+') {
+                e.preventDefault();
+                if (isHelpOpen) closeHelp(); else openHelp();
+                return;
+            }
+
+            // اگر پنل باز است، کلیدهای دیگر را اجرا نکن
+            if (isPanelOpen && e.target.tagName !== 'BUTTON') return;
+
+            // T برای متن جدید
+            if (key === 't') createItem('text', 'متن جدید');
+            
+            // P برای عدد جدید
+            if (key === 'p') createItem('number', '0');
+
+            // M برای ویرایش
+            if (key === 'm') {
+                if (currentMode === 'edit') setMode('none');
+                else setMode('edit');
+            }
+
+            // Q برای حذف
+            if (key === 'q') {
+                if (currentMode === 'delete') setMode('none');
+                else setMode('delete');
+            }
+
+            // Escape
+            if (e.key === 'Escape') {
+                setMode('none');
+                closeHelp();
+                document.querySelectorAll('.text-content').forEach(span => {
+                    span.contentEditable = "false";
+                    span.classList.remove('editing');
+                });
+            }
+        });
+
+        document.addEventListener('keyup', function(e) {
+            keysPressed[e.key] = false;
+        });
+
+        // --- شروع ---
+        window.onload = function() {
+            loadState();
+            // بازیابی فیلتر از حافظه
+            const saved = localStorage.getItem('imageEditorState');
+            if (saved) {
+                try {
+                    const state = JSON.parse(saved);
+                    if (state.filter) {
+                        document.body.style.filter = state.filter;
+                        // تلاش برای تنظیم اسلایدرها (اختیاری)
+                    }
+                } catch(e) {}
+            }
+        };
+
+    </script>
+</body>
+</html>
